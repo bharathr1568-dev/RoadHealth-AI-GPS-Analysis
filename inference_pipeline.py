@@ -4,10 +4,29 @@ Context-aware multi-scale inference with class-specific thresholding,
 road-region validation, and noise/hallucination prevention.
 """
 
+import os
+import gc
 import logging
 import traceback
+
+# Restrict multi-threaded memory allocation for CPU runtime
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import cv2
 import numpy as np
+import torch
+
+torch.set_num_threads(1)
+if hasattr(torch, "set_num_interop_threads"):
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass
+
 from config import (
     IMG_SIZE, TILE_SIZE, TILE_OVERLAP,
     CONF_POTHOLE, CONF_CRACK,
@@ -141,13 +160,14 @@ def _run_pass(model, img_bgr, source_name, x_offset=0, y_offset=0,
 
     logger.info(f"[DIAG 1/10] Invoking YOLO model.predict on '{source_name}' (input shape={img_bgr.shape}, imgsz={imgsz}, conf={min(conf_pothole, conf_crack)})...")
     try:
-        results = model.predict(
-            source=img_bgr,
-            imgsz=imgsz,
-            conf=min(conf_pothole, conf_crack),
-            iou=0.45,
-            verbose=False,
-        )
+        with torch.inference_mode():
+            results = model.predict(
+                source=img_bgr,
+                imgsz=imgsz,
+                conf=min(conf_pothole, conf_crack),
+                iou=0.45,
+                verbose=False,
+            )
         logger.info(f"[DIAG 2/10] YOLO model.predict completed successfully on '{source_name}'.")
         box_counts = [len(r.boxes) if (hasattr(r, 'boxes') and r.boxes is not None) else 0 for r in results]
         logger.info(f"[DIAG 3/10] Results returned from '{source_name}': count={len(results)}, type={type(results).__name__}, boxes={box_counts}")
@@ -201,6 +221,11 @@ def _run_pass(model, img_bgr, source_name, x_offset=0, y_offset=0,
                 "box": full_box,
                 "source": source_name,
             })
+
+    # Release raw PyTorch results object and collect garbage
+    del results
+    gc.collect()
+
     return detections
 
 

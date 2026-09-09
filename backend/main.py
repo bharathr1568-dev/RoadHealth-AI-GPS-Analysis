@@ -12,14 +12,30 @@ Run with:
   python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+import os
+# Restrict multi-threaded memory allocation for CPU runtime
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import logging
 from contextlib import asynccontextmanager
+
+import torch
+torch.set_num_threads(1)
+if hasattr(torch, "set_num_interop_threads"):
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.config import FRONTEND_DIR, RESULTS_DIR, UPLOADS_DIR, MODEL_INFO
+from backend.config import FRONTEND_DIR, RESULTS_DIR, UPLOADS_DIR, MODEL_INFO, get_rss_mb
 from backend.database.database import init_db
 from backend.database.seed_data import seed_default_officer, seed_demo_complaints
 from backend.api.routes import router
@@ -41,6 +57,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 65)
     logger.info("  RoadCare AI — Starting Municipal & Citizen Platform")
     logger.info(f"  AI Model: {MODEL_INFO['name']}")
+    logger.info(f"  [MEM] Application startup | RSS: {get_rss_mb():.1f} MB")
     logger.info("=" * 65)
 
     # 1. Initialize SQLite database & seed
@@ -56,7 +73,7 @@ async def lifespan(app: FastAPI):
     try:
         from backend.services.inference import load_model
         load_model()
-        logger.info("✅ Model pre-loaded successfully. Server is ready.")
+        logger.info(f"✅ Model pre-loaded successfully | RSS: {get_rss_mb():.1f} MB. Server is ready.")
     except Exception as e:
         logger.error(f"❌ Model loading failed: {e}")
         logger.error("   The server will start but /api/analyze will fail.")

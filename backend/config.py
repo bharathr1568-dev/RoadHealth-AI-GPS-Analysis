@@ -117,3 +117,16 @@ MODEL_INFO = {
     "mAP50": 0.842,
     "mAP50_95": 0.583,
 }
+
+
+def get_rss_mb() -> float:
+    """Return current process RSS memory in MB."""
+    try:
+        import psutil
+        return round(psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024), 2)
+    except Exception:
+        try:
+            import resource
+            return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 2)
+        except Exception:
+            return 0.0

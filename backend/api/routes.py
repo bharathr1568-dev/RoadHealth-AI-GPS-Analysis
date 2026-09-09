@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 
-from backend.config import MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, MODEL_INFO
+from backend.config import MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, MODEL_INFO, get_rss_mb
 from backend.services.inference import run_full_pipeline, get_class_names, load_model
 from backend.services.phs import format_phs_response
 from backend.services.location import (
@@ -191,7 +191,7 @@ async def analyze_road(
 
     logger.info(
         f"[DIAG 10/10] Analysis complete: {phs_data['total_defects']} defects, "
-        f"PHS={phs_data['phs']}, {t_elapsed:.2f}s. Returning API response..."
+        f"PHS={phs_data['phs']}, {t_elapsed:.2f}s | [MEM] Before API response: {get_rss_mb():.1f} MB. Returning API response..."
     )
 
     return response

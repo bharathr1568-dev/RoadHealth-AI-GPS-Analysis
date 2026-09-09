@@ -11,16 +11,31 @@ inference pipeline that reuses the existing project modules:
 
 import sys
 import os
+import gc
 import types
 import uuid
 import logging
 import traceback
 from pathlib import Path
 
+# Restrict multi-threaded memory allocation for CPU runtime
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
+
+torch.set_num_threads(1)
+if hasattr(torch, "set_num_interop_threads"):
+    try:
+        torch.set_num_interop_threads(1)
+    except RuntimeError:
+        pass
 
 logger = logging.getLogger("roadhealth.inference")
 
@@ -33,7 +48,7 @@ if _project_root not in sys.path:
 from ultralytics import YOLO
 import ultralytics.nn.tasks as tasks
 
-from backend.config import BASELINE_MODEL_PATH, CBAM_MODEL_PATH, RESULTS_DIR, UPLOADS_DIR
+from backend.config import BASELINE_MODEL_PATH, CBAM_MODEL_PATH, RESULTS_DIR, UPLOADS_DIR, get_rss_mb
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -118,11 +133,20 @@ class P2P3CBAMDetail(nn.Module):
 
 def _p2p3_cbam_predict(self, x, profile=False, visualize=False,
                        augment=False, embed=None):
-    """Exact P2→P3 CBAM forward pass (captures P2 at layer 2, fuses at layer 16)."""
+    """
+    Exact P2→P3 CBAM forward pass (captures P2 at layer 2, fuses at layer 16).
+    Releases intermediate activation maps immediately once consumed by downstream layers
+    to maintain minimal peak RAM on memory-constrained (512 MB) instances.
+    """
     if augment:
         raise NotImplementedError(
             "Augmented prediction is not supported for P2P3-CBAM model."
         )
+
+    # Identifies layers required by neck skip connections + P2 CBAM
+    save_set = set(getattr(self, "save", [4, 6, 10, 13, 16, 19, 22]))
+    save_set.add(2)  # Required for P2 CBAM detail branch
+
     outputs = {}
     current = x
     p2 = None
@@ -136,17 +160,35 @@ def _p2p3_cbam_predict(self, x, profile=False, visualize=False,
             inp = [current if j == -1 else outputs[j] for j in layer.f]
 
         current = layer(inp)
-        outputs[i] = current
+
+        if i in save_set:
+            outputs[i] = current
 
         if i == 2:
             p2 = current
-        if i == 16:
+        elif i == 12:
+            # Layer 6 was consumed by layer 12 (Concat); release immediately
+            outputs.pop(6, None)
+        elif i == 15:
+            # Layer 4 was consumed by layer 15 (Concat); release immediately
+            outputs.pop(4, None)
+        elif i == 16:
             if p2 is None:
                 raise RuntimeError("P2 feature map was not captured at layer 2.")
             detail = self.p2p3_cbam_detail(p2)
             current = current + detail
             outputs[i] = current
+            p2 = None
+            outputs.pop(2, None)  # Layer 2 no longer needed
+        elif i == 18:
+            # Layer 13 was consumed by layer 18 (Concat); release immediately
+            outputs.pop(13, None)
+        elif i == 21:
+            # Layer 10 was consumed by layer 21 (Concat); release immediately
+            outputs.pop(10, None)
 
+    # Free all remaining activation tensors
+    outputs.clear()
     return current
 
 
@@ -174,13 +216,14 @@ def load_model() -> YOLO:
     """
     Reconstruct and load the fine-tuned YOLO11m-P2P3-CBAM champion model.
     Replicates the logic from model_service.load_model() without Streamlit.
+    Ensures singleton loading and releases temporary loading structures.
     """
     global _model
     if _model is not None:
         return _model
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Loading model on device: {device}")
+    logger.info(f"[MEM] Loading model on {device} | RSS before: {get_rss_mb():.1f} MB")
 
     # Ensure __main__ module has classes registered
     _main = sys.modules.get("__main__")
@@ -226,7 +269,7 @@ def load_model() -> YOLO:
         raw_state = checkpoint.get("state_dict", {})
 
     learned_state = {
-        key: value.detach().cpu().clone()
+        key: value.detach().to(device)
         for key, value in raw_state.items()
         if torch.is_tensor(value)
         and "total_ops" not in key
@@ -238,17 +281,25 @@ def load_model() -> YOLO:
     assert len(missing) == 0, f"Missing weights: {missing}"
     assert len(unexpected) == 0, f"Unexpected weights: {unexpected}"
 
+    # Immediately release loading dictionaries to minimize RSS
+    del checkpoint
+    del model_obj
+    del raw_state
+    del learned_state
+
     net = net.to(device)
     net.eval()
 
-    # 5. Wrap back into Ultralytics YOLO interface
-    model = YOLO(str(BASELINE_MODEL_PATH))
+    # 5. Reuse baseline YOLO wrapper instance (avoids reloading best.pt a second time)
+    model = baseline
     model.model = net
+    del baseline
+    gc.collect()
 
     total_params = sum(p.numel() for p in net.parameters())
     logger.info(
         f"YOLO11m-P2P3-CBAM loaded successfully "
-        f"({total_params:,} parameters) on {device}"
+        f"({total_params:,} parameters) on {device} | [MEM] RSS after: {get_rss_mb():.1f} MB"
     )
 
     _model = model
@@ -315,10 +366,13 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         model = load_model()
 
         # 1. Multi-pass inference (full + tiled) on verified road image
+        logger.info(f"[MEM] Before YOLO inference | RSS: {get_rss_mb():.1f} MB")
         logger.info("Running YOLO11m-P2P3-CBAM inference pipeline...")
         try:
-            all_raw, nms_detections = run_inference(model, image_bgr)
+            with torch.inference_mode():
+                all_raw, nms_detections = run_inference(model, image_bgr)
             logger.info(f"Raw detections: {len(all_raw)}, after NMS: {len(nms_detections)}")
+            logger.info(f"[MEM] After YOLO inference | RSS: {get_rss_mb():.1f} MB")
         except Exception as e:
             logger.error(f"[DIAG ERROR] run_inference pipeline failed: {e}\n{traceback.format_exc()}")
             raise
@@ -328,6 +382,7 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         try:
             final_detections = process_detections(nms_detections, image_bgr)
             logger.info(f"[DIAG 5/10] Detection processing completed: {len(final_detections)} final detections.")
+            logger.info(f"[MEM] After result processing | RSS: {get_rss_mb():.1f} MB")
         except Exception as e:
             logger.error(f"[DIAG ERROR] process_detections failed: {e}\n{traceback.format_exc()}")
             raise
@@ -352,6 +407,7 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
     try:
         annotated = draw_detections(image_bgr, features)
         logger.info(f"[DIAG 7/10] Annotated image generated successfully (shape={annotated.shape}).")
+        logger.info(f"[MEM] After annotation | RSS: {get_rss_mb():.1f} MB")
     except Exception as e:
         logger.error(f"[DIAG ERROR] draw_detections failed: {e}\n{traceback.format_exc()}")
         raise
