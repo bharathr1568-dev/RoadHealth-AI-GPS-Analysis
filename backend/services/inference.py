@@ -14,6 +14,7 @@ import os
 import types
 import uuid
 import logging
+import traceback
 from pathlib import Path
 
 import cv2
@@ -315,38 +316,62 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
 
         # 1. Multi-pass inference (full + tiled) on verified road image
         logger.info("Running YOLO11m-P2P3-CBAM inference pipeline...")
-        all_raw, nms_detections = run_inference(model, image_bgr)
-        logger.info(f"Raw detections: {len(all_raw)}, after NMS: {len(nms_detections)}")
+        try:
+            all_raw, nms_detections = run_inference(model, image_bgr)
+            logger.info(f"Raw detections: {len(all_raw)}, after NMS: {len(nms_detections)}")
+        except Exception as e:
+            logger.error(f"[DIAG ERROR] run_inference pipeline failed: {e}\n{traceback.format_exc()}")
+            raise
 
         # 2. Physical merging & crack refinement
-        final_detections = process_detections(nms_detections, image_bgr)
-        logger.info(f"After merging/refinement: {len(final_detections)} detections")
+        logger.info(f"[DIAG 4/10] Starting detection processing (merging/refinement) on {len(nms_detections)} detections...")
+        try:
+            final_detections = process_detections(nms_detections, image_bgr)
+            logger.info(f"[DIAG 5/10] Detection processing completed: {len(final_detections)} final detections.")
+        except Exception as e:
+            logger.error(f"[DIAG ERROR] process_detections failed: {e}\n{traceback.format_exc()}")
+            raise
 
         # 3. Feature extraction (severity scoring)
-        H, W = image_bgr.shape[:2]
-        features = extract_features(final_detections, image_bgr)
+        try:
+            H, W = image_bgr.shape[:2]
+            features = extract_features(final_detections, image_bgr)
 
-        # 4. Zone damage analysis
-        zone_damage, critical_zone_id, critical_zone_score, critical_zone_risk = \
-            compute_zone_damage(features, W, H)
+            # 4. Zone damage analysis
+            zone_damage, critical_zone_id, critical_zone_score, critical_zone_risk = \
+                compute_zone_damage(features, W, H)
 
-        # 5. PHS computation (uses existing road_health.py)
-        health_summary = compute_road_health(features, zone_damage, [])
+            # 5. PHS computation (uses existing road_health.py)
+            health_summary = compute_road_health(features, zone_damage, [])
+        except Exception as e:
+            logger.error(f"[DIAG ERROR] Feature extraction / PHS computation failed: {e}\n{traceback.format_exc()}")
+            raise
 
     # 6. Draw annotated image
-    annotated = draw_detections(image_bgr, features)
+    logger.info(f"[DIAG 6/10] Generating annotated image for {len(features)} features...")
+    try:
+        annotated = draw_detections(image_bgr, features)
+        logger.info(f"[DIAG 7/10] Annotated image generated successfully (shape={annotated.shape}).")
+    except Exception as e:
+        logger.error(f"[DIAG ERROR] draw_detections failed: {e}\n{traceback.format_exc()}")
+        raise
 
     # 7. Save original and annotated results using StorageProvider abstraction
-    from backend.services.storage import get_storage_provider
-    storage = get_storage_provider()
+    logger.info("[DIAG 8/10] Saving original and annotated image files via StorageProvider...")
+    try:
+        from backend.services.storage import get_storage_provider
+        storage = get_storage_provider()
 
-    uid = uuid.uuid4().hex[:12]
-    original_filename = f"upload_{uid}.jpg"
-    result_filename = f"result_{uid}.jpg"
+        uid = uuid.uuid4().hex[:12]
+        original_filename = f"upload_{uid}.jpg"
+        result_filename = f"result_{uid}.jpg"
 
-    original_url = storage.save_cv2_image(image_bgr, original_filename, folder="uploads", quality=95)
-    annotated_url = storage.save_cv2_image(annotated, result_filename, folder="results", quality=92)
-    logger.info(f"Original image saved: {original_url}, Annotated: {annotated_url}")
+        original_url = storage.save_cv2_image(image_bgr, original_filename, folder="uploads", quality=95)
+        annotated_url = storage.save_cv2_image(annotated, result_filename, folder="results", quality=92)
+        logger.info(f"[DIAG 9/10] Files saved successfully: original={original_url}, annotated={annotated_url}")
+    except Exception as e:
+        logger.error(f"[DIAG ERROR] Storage save_cv2_image failed: {e}\n{traceback.format_exc()}")
+        raise
 
     # 8. Build detection list for API response (ensure native Python types)
     detection_list = []

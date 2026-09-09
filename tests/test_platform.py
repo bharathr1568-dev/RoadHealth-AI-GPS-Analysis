@@ -79,7 +79,11 @@ def test_platform_e2e():
 
     # 4. AI Analysis
     print("\n[4/8] Testing /api/analyze with sample image...")
-    sample_imgs = list((PROJECT_ROOT / "data").glob("**/*.jpg")) + list((PROJECT_ROOT / "data").glob("**/*.png"))
+    sample_imgs = (
+        list((PROJECT_ROOT / "data").glob("**/*.jpg")) +
+        list((PROJECT_ROOT / "data").glob("**/*.png")) +
+        list((PROJECT_ROOT / "backend" / "uploads").glob("*.jpg"))
+    )
     if sample_imgs:
         sample_img_path = sample_imgs[0]
         with open(sample_img_path, "rb") as f:

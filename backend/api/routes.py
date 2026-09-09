@@ -190,8 +190,8 @@ async def analyze_road(
     }
 
     logger.info(
-        f"Analysis complete: {phs_data['total_defects']} defects, "
-        f"PHS={phs_data['phs']}, {t_elapsed:.2f}s"
+        f"[DIAG 10/10] Analysis complete: {phs_data['total_defects']} defects, "
+        f"PHS={phs_data['phs']}, {t_elapsed:.2f}s. Returning API response..."
     )
 
     return response

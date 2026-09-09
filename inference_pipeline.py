@@ -4,6 +4,8 @@ Context-aware multi-scale inference with class-specific thresholding,
 road-region validation, and noise/hallucination prevention.
 """
 
+import logging
+import traceback
 import cv2
 import numpy as np
 from config import (
@@ -13,6 +15,8 @@ from config import (
     USE_CLAHE_AUX, IOU_MERGE_THRESHOLD,
 )
 from utils import normalize_class_name, box_iou
+
+logger = logging.getLogger("roadhealth.inference_pipeline")
 
 
 # ── Image Quality Assessment ───────────────────────────────────
@@ -135,13 +139,21 @@ def _run_pass(model, img_bgr, source_name, x_offset=0, y_offset=0,
     H = img_h or img_bgr.shape[0]
     validation_ref = full_image_ref if full_image_ref is not None else img_bgr
 
-    results = model.predict(
-        source=img_bgr,
-        imgsz=imgsz,
-        conf=min(conf_pothole, conf_crack),
-        iou=0.45,
-        verbose=False,
-    )
+    logger.info(f"[DIAG 1/10] Invoking YOLO model.predict on '{source_name}' (input shape={img_bgr.shape}, imgsz={imgsz}, conf={min(conf_pothole, conf_crack)})...")
+    try:
+        results = model.predict(
+            source=img_bgr,
+            imgsz=imgsz,
+            conf=min(conf_pothole, conf_crack),
+            iou=0.45,
+            verbose=False,
+        )
+        logger.info(f"[DIAG 2/10] YOLO model.predict completed successfully on '{source_name}'.")
+        box_counts = [len(r.boxes) if (hasattr(r, 'boxes') and r.boxes is not None) else 0 for r in results]
+        logger.info(f"[DIAG 3/10] Results returned from '{source_name}': count={len(results)}, type={type(results).__name__}, boxes={box_counts}")
+    except Exception as e:
+        logger.error(f"[DIAG ERROR] YOLO model.predict failed on '{source_name}': {e}\n{traceback.format_exc()}")
+        raise
 
     detections = []
     for result in results:
