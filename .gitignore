@@ -1,0 +1,59 @@
+# ── Environment & Secrets ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.cert
+*.pfx
+
+# ── Databases ───────────────────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backend/database/*.db
+backend/database/*.db-shm
+backend/database/*.db-wal
+
+# ── Local Uploads & Generated Results ───────────────────────────
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/results/*
+!backend/results/.gitkeep
+
+# ── Temporary, Cache & Scratch Files ────────────────────────────
+scratch/
+outputs/
+reports/
+runs/
+.pytest_cache/
+*.log
+tmp/
+temp/
+
+# ── Python Cache & Compiled Files ───────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# ── Virtual Environments ─────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+ENV*/
+
+# ── IDE & OS System Files ───────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

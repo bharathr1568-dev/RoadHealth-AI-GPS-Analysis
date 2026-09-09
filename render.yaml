@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: roadhealth-ai
+    env: python
+    region: oregon
+    plan: standard
+    buildCommand: "pip install --upgrade pip && pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: roadhealth-db
+          property: connectionString
+      - key: ENVIRONMENT
+        value: production
+      - key: STORAGE_BACKEND
+        value: cloudinary
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: OFFICER_EMAIL
+        value: bharath4330
+      - key: OFFICER_NAME
+        value: Bharath
+      - key: OFFICER_PASSWORD
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+databases:
+  - name: roadhealth-db
+    region: oregon
+    plan: free
+    databaseName: roadhealth
+    user: roadadmin

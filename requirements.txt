@@ -1,0 +1,16 @@
+# ── Core AI ────────────────────────────────────────────────────
+ultralytics>=8.0.0
+torch>=2.0.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# ── Web Server ─────────────────────────────────────────────────
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-multipart>=0.0.6
+
+# ── Database & Cloud Storage (Dual-Mode: Local SQLite / Render PostgreSQL + Cloudinary) ──
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+cloudinary>=1.36.0

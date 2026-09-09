@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="description" content="AI-Powered Citizen Road Condition Reporting and Municipal Road Intelligence Platform. Powered by YOLO11m-P2P3-CBAM.">
+    <meta name="theme-color" content="#0b101b">
+    <title>RoadCare AI — Citizen Road Reporting & Municipal Intelligence</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- TOP NAVIGATION & PORTAL SWITCHER                        -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <header class="app-nav">
+        <div class="nav-container">
+            <div class="nav-brand" id="brand-home-btn">
+                <div class="brand-logo-glow"></div>
+                <div class="brand-icon">
+                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                        <circle cx="24" cy="24" r="22" stroke="url(#navgrad)" stroke-width="2.5" fill="none"/>
+                        <path d="M14 32 Q24 12 34 32" stroke="url(#navgrad)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="24" cy="24" r="4.5" fill="url(#navgrad)"/>
+                        <defs>
+                            <linearGradient id="navgrad" x1="0" y1="0" x2="48" y2="48">
+                                <stop offset="0%" stop-color="#06b6d4"/>
+                                <stop offset="100%" stop-color="#6366f1"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">ROADCARE <span class="brand-ai">AI</span></span>
+                    <span class="brand-subtitle">Municipal Road Intelligence</span>
+                </div>
+            </div>
+
+            <!-- Experience Switcher -->
+            <div class="portal-switcher">
+                <button class="portal-btn active" id="btn-portal-citizen">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Citizen Portal</span>
+                </button>
+                <button class="portal-btn" id="btn-portal-officer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span>Municipality Portal</span>
+                    <span class="badge-notif-count" id="nav-notif-badge" style="display:none;">0</span>
+                </button>
+            </div>
+
+            <!-- Header Right: Officer info / Quick action -->
+            <div class="nav-right">
+                <div id="officer-session-pill" style="display:none;">
+                    <div class="officer-avatar">👮</div>
+                    <span class="officer-name" id="nav-officer-name">Chief Officer</span>
+                    <button class="btn-logout" id="btn-officer-logout" title="Sign Out">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="15"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- CITIZEN PORTAL EXPERIENCE                               -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="portal-view active" id="view-citizen">
+
+        <!-- Citizen Sub-navigation -->
+        <nav class="citizen-subnav">
+            <div class="subnav-container">
+                <button class="subnav-link active" id="cnav-report">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                    Report Road
+                </button>
+                <button class="subnav-link" id="cnav-track">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Track / My Reports
+                    <span class="cnav-counter" id="my-reports-count" style="display:none;">0</span>
+                </button>
+                <button class="subnav-link" id="cnav-about">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    About & AI Model
+                </button>
+            </div>
+        </nav>
+
+        <!-- Citizen Section: Report Flow -->
+        <section class="citizen-subview active" id="citizen-report-view">
+            <!-- Hero Banner -->
+            <div class="hero-section">
+                <div class="hero-glow"></div>
+                <div class="hero-content">
+                    <div class="hero-pill">
+                        <span class="live-dot"></span>
+                        Civic Road Intelligence
+                    </div>
+                    <h1 class="hero-title">Report a Road Problem</h1>
+                    <p class="hero-subtitle">Help identify damaged roads using AI-powered road condition analysis with GPS defect localization.</p>
+                    
+                    <div class="hero-badges">
+                        <div class="hero-badge-item">
+                            <span class="hb-icon">🤖</span>
+                            <span>YOLO11m-P2P3-CBAM</span>
+                        </div>
+                        <div class="hero-badge-item">
+                            <span class="hb-icon">📍</span>
+                            <span>High-Precision GPS</span>
+                        </div>
+                        <div class="hero-badge-item">
+                            <span class="hb-icon">📊</span>
+                            <span>Road Health Score</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <main class="wizard-container">
+                <!-- STEP 1: CAPTURE IMAGE -->
+                <section class="step-card" id="step-image-card">
+                    <div class="step-header">
+                        <div class="step-num">1</div>
+                        <div class="step-meta">
+                            <h3>Capture Road Image</h3>
+                            <p>Take a road photograph using your camera or upload an existing road photo.</p>
+                        </div>
+                    </div>
+
+                    <div class="upload-dropzone" id="drop-zone">
+                        <div class="upload-actions">
+                            <label class="btn btn-primary btn-camera" for="input-camera">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                Take Photo
+                            </label>
+                            <input type="file" id="input-camera" accept="image/*" capture="environment" hidden>
+
+                            <label class="btn btn-secondary btn-upload" for="input-upload">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Upload Image
+                            </label>
+                            <input type="file" id="input-upload" accept="image/*" hidden>
+                        </div>
+                        <p class="dropzone-hint">Supports JPG, PNG, WEBP (Max 20MB)</p>
+                    </div>
+
+                    <!-- Image Preview -->
+                    <div class="preview-box" id="image-preview-box" style="display:none;">
+                        <img id="image-preview" alt="Road photo preview">
+                        <button class="btn-clear-preview" id="btn-clear-img" title="Remove photo">✕</button>
+                        <div class="preview-badge" id="preview-meta-badge">Image Loaded</div>
+                    </div>
+                </section>
+
+                <!-- STEP 2: CAPTURE GPS LOCATION -->
+                <section class="step-card" id="step-gps-card">
+                    <div class="step-header">
+                        <div class="step-num">2</div>
+                        <div class="step-meta">
+                            <h3>Capture Road Location</h3>
+                            <p>Pinpoint the road defect coordinates using your device GPS location.</p>
+                        </div>
+                    </div>
+
+                    <!-- Initial State: Get Location Button -->
+                    <div class="gps-initial-box" id="gps-initial-box">
+                        <button class="btn btn-gps" id="btn-get-gps">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                            <span id="gps-btn-text">📍 Get My Current Location</span>
+                        </button>
+                        <p class="gps-disclaimer" id="gps-status-msg">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            Click to acquire your exact device location. Ensure browser location permission is allowed.
+                        </p>
+                    </div>
+
+                    <!-- Captured Location Display Panel -->
+                    <div class="gps-confirmed-panel" id="gps-confirmed-panel" style="display:none;">
+                        <div class="confirmed-status-header">
+                            <div class="confirmed-badge">
+                                <span class="lock-icon">📍</span>
+                                <span>Location Captured Successfully</span>
+                            </div>
+                            <button class="btn-reacquire" id="btn-reacquire-gps">
+                                🔄 Refresh Location
+                            </button>
+                        </div>
+
+                        <div class="gps-data-grid" id="gps-info-grid">
+                            <div class="gps-data-card">
+                                <span class="label">Latitude</span>
+                                <span class="val" id="gps-lat">—</span>
+                            </div>
+                            <div class="gps-data-card">
+                                <span class="label">Longitude</span>
+                                <span class="val" id="gps-lon">—</span>
+                            </div>
+                            <div class="gps-data-card">
+                                <span class="label">Accuracy</span>
+                                <span class="val" id="gps-acc">—</span>
+                            </div>
+                            <div class="gps-data-card">
+                                <span class="label">Captured Time</span>
+                                <span class="val" id="gps-time">—</span>
+                            </div>
+                        </div>
+
+                        <!-- Embedded Interactive Map -->
+                        <div class="gps-live-map-wrapper" style="margin-top:1rem;">
+                            <div id="gps-live-leaflet-map" class="gps-live-map-box" style="height:220px; border-radius:10px; z-index:1;"></div>
+                            <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.4rem; text-align:center;">
+                                💡 Tip: You can drag the marker or click on the map to fine-tune the exact road spot.
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STEP 3: ANALYZE ACTION -->
+                <section class="step-card action-card" id="step-analyze-card">
+                    <div class="analyze-action-wrapper">
+                        <button class="btn btn-analyze" id="btn-analyze" disabled>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span>Analyze Road</span>
+                        </button>
+                        <p class="analyze-hint" id="analyze-hint">Please select a road image and capture your GPS coordinates to proceed.</p>
+                    </div>
+
+                    <!-- Loading / Scan Animation -->
+                    <div class="analysis-loading" id="analysis-loading" style="display:none;">
+                        <div class="scanner-anim">
+                            <div class="scanner-line"></div>
+                        </div>
+                        <div class="loading-status">
+                            <div class="spinner"></div>
+                            <span id="loading-stage-text">Running YOLO11m-P2P3-CBAM inference...</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STEP 4: ANALYSIS RESULT & SUBMISSION -->
+                <section class="result-section" id="result-section" style="display:none;">
+                    <div class="section-title-bar">
+                        <h2>ROAD CONDITION REPORT</h2>
+                        <span class="model-tag">YOLO11m-P2P3-CBAM</span>
+                    </div>
+
+                    <!-- Side by side / Comparison View -->
+                    <div class="image-compare-grid">
+                        <div class="compare-card">
+                            <div class="compare-card-header">
+                                <span class="badge-orig">ORIGINAL ROAD IMAGE</span>
+                            </div>
+                            <div class="img-wrapper">
+                                <img id="res-original-img" alt="Original Road Photo">
+                            </div>
+                        </div>
+
+                        <div class="compare-card highlight-ai">
+                            <div class="compare-card-header">
+                                <span class="badge-ai">AI DETECTED IMAGE (BOUNDING BOXES)</span>
+                            </div>
+                            <div class="img-wrapper">
+                                <img id="res-annotated-img" alt="AI Annotated Road Photo">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metric Overview: Defects Summary & RHS -->
+                    <div class="metrics-dashboard-grid">
+                        <!-- RHS Dial Card -->
+                        <div class="metric-card phs-gauge-card">
+                            <h4>ROAD HEALTH SCORE (RHS)</h4>
+                            <div class="phs-dial-container">
+                                <div class="phs-circle" id="phs-circle">
+                                    <span class="phs-num" id="res-phs-val">--</span>
+                                    <span class="phs-denom">/ 100</span>
+                                </div>
+                            </div>
+                            <div class="condition-badge-wrap">
+                                <span class="condition-badge" id="res-condition-badge">GOOD</span>
+                            </div>
+                            <p class="phs-priority-label">Priority: <strong id="res-priority-label">NORMAL</strong></p>
+                        </div>
+
+                        <!-- Defect Counter Cards -->
+                        <div class="metric-card defects-summary-card">
+                            <h4>DETECTION SUMMARY</h4>
+                            <div class="defect-counts-grid">
+                                <div class="count-box total">
+                                    <span class="count-num" id="res-total-defects">0</span>
+                                    <span class="count-lbl">Total Defects</span>
+                                </div>
+                                <div class="count-box pothole">
+                                    <span class="count-num" id="res-pothole-count">0</span>
+                                    <span class="count-lbl">Potholes</span>
+                                </div>
+                                <div class="count-box crack">
+                                    <span class="count-num" id="res-crack-count">0</span>
+                                    <span class="count-lbl">Cracks</span>
+                                </div>
+                            </div>
+
+                            <!-- Itemized Detections List -->
+                            <div class="detections-table-box">
+                                <h5>Detected Defect Details</h5>
+                                <div class="detections-list" id="res-detections-list">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Location & Map Card -->
+                    <div class="metric-card location-map-card">
+                        <div class="loc-header">
+                            <h4>LOCATION & GIS</h4>
+                            <a id="btn-open-gmaps" target="_blank" rel="noopener noreferrer" class="btn-link-map">
+                                📍 View Affected Location on Google Maps ↗
+                            </a>
+                        </div>
+                        <div class="loc-meta-bar" id="res-loc-meta-bar">
+                            <span>Lat: <strong id="res-lat">—</strong></span>
+                            <span>Lon: <strong id="res-lon">—</strong></span>
+                            <span>Accuracy: <strong id="res-acc">—</strong></span>
+                        </div>
+                        <div id="citizen-leaflet-map" class="map-view-box"></div>
+                    </div>
+
+                    <!-- STEP 5: COMPLAINT SUBMISSION CARD -->
+                    <div class="metric-card complaint-submission-card" id="card-submit-complaint">
+                        <div class="submission-header">
+                            <div class="sub-icon">📝</div>
+                            <div>
+                                <h4>Submit Official Road Complaint</h4>
+                                <p>Forward this verified AI analysis directly to municipal highway engineers for repair.</p>
+                            </div>
+                        </div>
+
+                        <div class="complaint-form-grid">
+                            <div class="form-group">
+                                <label for="citizen-input-phone">Phone / Contact (Optional)</label>
+                                <input type="tel" id="citizen-input-phone" placeholder="e.g. +91 98765 43210" class="form-input">
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="citizen-input-desc">Additional Details / Landmark (Optional)</label>
+                                <textarea id="citizen-input-desc" rows="2" placeholder="e.g. Near main bus stop junction, dangerous for two-wheelers." class="form-input"></textarea>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-submit-complaint" id="btn-submit-complaint">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            Submit Complaint
+                        </button>
+                    </div>
+
+                    <!-- Submission Confirmation Box -->
+                    <div class="submission-success-card" id="submission-success-box" style="display:none;">
+                        <div class="success-icon">🎉</div>
+                        <h3>Complaint Submitted Successfully!</h3>
+                        <p>Your road issue has been registered in the municipal management system.</p>
+                        <div class="complaint-id-display">
+                            <span class="lbl">Complaint ID</span>
+                            <span class="val" id="success-complaint-id">RCA-2026-000000</span>
+                        </div>
+                        <div class="success-actions">
+                            <button class="btn btn-primary" id="btn-view-my-complaint">
+                                🔍 Track This Complaint
+                            </button>
+                            <button class="btn btn-secondary" id="btn-new-report">
+                                ➕ Report Another Road
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </section>
+
+        <!-- Citizen Section: Track / My Reports -->
+        <section class="citizen-subview" id="citizen-track-view" style="display:none;">
+            <div class="track-header-bar">
+                <h2>Track Road Complaints</h2>
+                <p>Check the live progress, inspection status, and repair updates of reported roads.</p>
+            </div>
+
+            <!-- Search by ID -->
+            <div class="track-search-card">
+                <div class="search-input-wrap">
+                    <input type="text" id="track-search-input" placeholder="Enter Complaint ID (e.g. RCA-2026-000001)" class="form-input">
+                    <button class="btn btn-primary" id="btn-track-search">Search</button>
+                </div>
+            </div>
+
+            <!-- Tracked Complaint Live Details -->
+            <div id="tracked-complaint-result" style="display:none;">
+                <!-- Rendered dynamically -->
+            </div>
+
+            <!-- My Previous Reports List -->
+            <div class="my-reports-section">
+                <h3>My Submitted Reports (This Device)</h3>
+                <div class="my-reports-list" id="my-reports-container">
+                    <p class="empty-state">No complaints submitted from this browser yet. Use the Report Road tab to submit your first report.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Citizen Section: About Model -->
+        <section class="citizen-subview" id="citizen-about-view" style="display:none;">
+            <div class="about-card">
+                <h2>About RoadCare AI Platform</h2>
+                <p class="lead">An end-to-end civic technology platform bridging citizens and municipal engineers for rapid road maintenance.</p>
+
+                <div class="about-grid">
+                    <div class="about-feature-box">
+                        <div class="feat-icon">🧠</div>
+                        <h4>YOLO11m-P2P3-CBAM Attention</h4>
+                        <p>Our champion research architecture augments YOLO11 with high-resolution P2→P3 multi-scale detail feature extraction and Convolutional Block Attention Modules (CBAM) to reliably detect fine cracks and deep potholes.</p>
+                    </div>
+
+                    <div class="about-feature-box">
+                        <div class="feat-icon">📊</div>
+                        <h4>Road Health Score (RHS)</h4>
+                        <p>A rigorous 0–100 numerical index evaluating defect severity, spatial density, and critical zone damage into actionable engineering categories (Excellent, Good, Moderate, Poor, Critical).</p>
+                    </div>
+
+                    <div class="about-feature-box">
+                        <div class="feat-icon">🏛️</div>
+                        <h4>Municipal Workflow Triage</h4>
+                        <p>Provides municipal road officers with real-time notifications, interactive GIS maps, side-by-side original/annotated image analysis, and audit timelines from submission to resolution.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- MUNICIPALITY / OFFICER PORTAL EXPERIENCE                -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="portal-view" id="view-officer" style="display:none;">
+
+        <!-- Officer Login Dialog (Shown when unauthenticated) -->
+        <div class="officer-login-screen" id="officer-login-card">
+            <div class="login-box">
+                <div class="login-badge">🏛️ MUNICIPALITY PORTAL</div>
+                <h2>Officer Sign In</h2>
+                <p class="login-desc">Authorized municipal engineers and road inspectors only.</p>
+
+                <form id="form-officer-login" class="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Official User ID / Email</label>
+                        <input type="text" id="login-email" required class="form-input" placeholder="Enter Official User ID or Email" autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required class="form-input" placeholder="Enter Password" autocomplete="current-password">
+                    </div>
+                    <div class="login-error-msg" id="login-error-msg" style="display:none;"></div>
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-login-submit">
+                        Sign In to Dashboard
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-block" id="btn-quick-fill-demo">
+                        ⚡ Quick Demo Account Fill
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Officer Authenticated Dashboard -->
+        <div class="officer-dashboard-layout" id="officer-authenticated-view" style="display:none;">
+            <!-- Officer Sidebar / Nav -->
+            <aside class="officer-sidebar">
+                <div class="sidebar-header">
+                    <span class="dept-tag">MUNICIPAL ROADS DIV</span>
+                    <h3 id="officer-sidebar-name">Chief Road Officer</h3>
+                </div>
+
+                <nav class="sidebar-menu">
+                    <button class="snav-btn active" id="snav-dash" data-target="tab-dash">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        <span>Dashboard</span>
+                    </button>
+                    <button class="snav-btn" id="snav-complaints" data-target="tab-complaints">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        <span>Complaints</span>
+                    </button>
+                    <button class="snav-btn" id="snav-map" data-target="tab-map">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                        <span>Road Map</span>
+                    </button>
+                    <button class="snav-btn" id="snav-analytics" data-target="tab-analytics">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        <span>Analytics</span>
+                    </button>
+                    <button class="snav-btn" id="snav-notifs" data-target="tab-notifs">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                        <span>Notifications</span>
+                        <span class="snav-badge" id="sidebar-notif-badge" style="display:none;">0</span>
+                    </button>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <button class="btn-signout" id="btn-sidebar-signout">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="15"/></svg>
+                        Sign Out
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Officer Main Content Area -->
+            <main class="officer-main-panel">
+
+                <!-- TAB 1: DASHBOARD -->
+                <section class="officer-tab-content active" id="tab-dash">
+                    <div class="tab-header-row">
+                        <div>
+                            <h2>Municipal Road Intelligence Dashboard</h2>
+                            <p class="text-muted">Live overview of citizen submissions and AI road assessments.</p>
+                        </div>
+                        <button class="btn btn-refresh" id="btn-refresh-dash">🔄 Refresh Data</button>
+                    </div>
+
+                    <!-- KPI Summary Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card total">
+                            <span class="kpi-title">TOTAL COMPLAINTS</span>
+                            <span class="kpi-value" id="kpi-total">0</span>
+                            <span class="kpi-sub">All time recorded</span>
+                        </div>
+                        <div class="kpi-card new">
+                            <span class="kpi-title">NEW COMPLAINTS</span>
+                            <span class="kpi-value" id="kpi-new">0</span>
+                            <span class="kpi-sub">Awaiting initial review</span>
+                        </div>
+                        <div class="kpi-card review">
+                            <span class="kpi-title">UNDER REVIEW</span>
+                            <span class="kpi-value" id="kpi-review">0</span>
+                            <span class="kpi-sub">Inspection scheduled</span>
+                        </div>
+                        <div class="kpi-card critical">
+                            <span class="kpi-title">CRITICAL ROADS</span>
+                            <span class="kpi-value" id="kpi-critical">0</span>
+                            <span class="kpi-sub">🔴 Severe damage (RHS &lt; 40)</span>
+                        </div>
+                        <div class="kpi-card resolved">
+                            <span class="kpi-title">RESOLVED</span>
+                            <span class="kpi-value" id="kpi-resolved">0</span>
+                            <span class="kpi-sub">Repairs completed</span>
+                        </div>
+                    </div>
+
+                    <!-- AI Priority Triage Alert Banner -->
+                    <div class="priority-alert-banner" id="dash-priority-banner" style="display:none;">
+                        <div class="p-icon">⚠️</div>
+                        <div class="p-text">
+                            <h4>AI-Assisted Priority Indication: Urgent Action Required</h4>
+                            <p id="dash-priority-text">High-density defect roads detected requiring immediate road crew triage.</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Complaints Table -->
+                    <div class="dash-card">
+                        <div class="card-title-row">
+                            <h3>Recent Road Complaints</h3>
+                            <button class="btn-link" id="btn-goto-all-complaints">View All Complaints →</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table" id="table-recent-complaints">
+                                <thead>
+                                    <tr>
+                                        <th>Complaint ID</th>
+                                        <th>Issue / Defects</th>
+                                        <th>RHS</th>
+                                        <th>Condition</th>
+                                        <th>AI Priority</th>
+                                        <th>Status</th>
+                                        <th>Reported</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 2: COMPLAINTS LIST -->
+                <section class="officer-tab-content" id="tab-complaints" style="display:none;">
+                    <div class="tab-header-row">
+                        <div>
+                            <h2>Road Complaints Management</h2>
+                            <p class="text-muted">Filter, search, inspect, and update statuses of reported roads.</p>
+                        </div>
+                    </div>
+
+                    <!-- Search & Filter Bar -->
+                    <div class="filters-card">
+                        <div class="filter-row">
+                            <div class="search-box">
+                                <input type="text" id="filter-search-input" placeholder="Search ID, location, defects, phone..." class="form-input">
+                            </div>
+                            <div class="filter-dropdowns">
+                                <select id="filter-status-select" class="form-select">
+                                    <option value="ALL">All Statuses</option>
+                                    <option value="NEW">NEW</option>
+                                    <option value="UNDER REVIEW">UNDER REVIEW</option>
+                                    <option value="VERIFIED">VERIFIED</option>
+                                    <option value="ASSIGNED">ASSIGNED</option>
+                                    <option value="IN PROGRESS">IN PROGRESS</option>
+                                    <option value="RESOLVED">RESOLVED</option>
+                                    <option value="REJECTED">REJECTED</option>
+                                </select>
+
+                                <select id="filter-condition-select" class="form-select">
+                                    <option value="ALL">All Conditions</option>
+                                    <option value="CRITICAL">Critical (🔴)</option>
+                                    <option value="POOR">Poor (🟠)</option>
+                                    <option value="MODERATE">Moderate (🟡)</option>
+                                    <option value="GOOD">Good (🟢)</option>
+                                </select>
+
+                                <select id="filter-sort-select" class="form-select">
+                                    <option value="newest">Sort: Newest First</option>
+                                    <option value="oldest">Sort: Oldest First</option>
+                                    <option value="phs_asc">Sort: Lowest RHS (Most Critical)</option>
+                                    <option value="defects_desc">Sort: Most Defects</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Complaints Table -->
+                    <div class="dash-card">
+                        <div class="table-responsive">
+                            <table class="data-table" id="table-all-complaints">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Thumbnail</th>
+                                        <th>Defects</th>
+                                        <th>RHS</th>
+                                        <th>Condition</th>
+                                        <th>Priority</th>
+                                        <th>Status</th>
+                                        <th>Reported</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 3: ROAD MAP -->
+                <section class="officer-tab-content" id="tab-map" style="display:none;">
+                    <div class="tab-header-row">
+                        <div>
+                            <h2>Municipal Road Condition Map</h2>
+                            <p class="text-muted">Geospatial visualization of road condition reports across the city.</p>
+                        </div>
+                        <div class="map-legend">
+                            <span class="legend-item"><span class="leg-dot red"></span> Critical</span>
+                            <span class="legend-item"><span class="leg-dot orange"></span> Poor</span>
+                            <span class="legend-item"><span class="leg-dot yellow"></span> Moderate</span>
+                            <span class="legend-item"><span class="leg-dot green"></span> Good</span>
+                        </div>
+                    </div>
+
+                    <div class="officer-map-wrapper">
+                        <div id="officer-leaflet-map" class="officer-map-view"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 4: ANALYTICS -->
+                <section class="officer-tab-content" id="tab-analytics" style="display:none;">
+                    <div class="tab-header-row">
+                        <div>
+                            <h2>Road Defect Analytics</h2>
+                            <p class="text-muted">Statistical breakdown of detected road damage classes and health trends.</p>
+                        </div>
+                    </div>
+
+                    <div class="analytics-grid">
+                        <div class="dash-card">
+                            <h3>Defects by Classification</h3>
+                            <div class="chart-bars" id="analytics-defect-bars">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="dash-card">
+                            <h3>Road Condition Distribution</h3>
+                            <div class="chart-bars" id="analytics-condition-bars">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 5: NOTIFICATIONS -->
+                <section class="officer-tab-content" id="tab-notifs" style="display:none;">
+                    <div class="tab-header-row">
+                        <div>
+                            <h2>Incoming Complaint Notifications</h2>
+                            <p class="text-muted">Real-time alerts whenever citizens submit new road condition reports.</p>
+                        </div>
+                        <button class="btn btn-secondary" id="btn-mark-all-read">✓ Mark All as Read</button>
+                    </div>
+
+                    <div class="notifications-list" id="officer-notifications-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- COMPLAINT DETAIL MODAL                                  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="modal-backdrop" id="modal-complaint-detail" style="display:none;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-badge-row">
+                        <span class="complaint-id-tag" id="modal-cid">RCA-2026-000000</span>
+                        <span class="status-badge" id="modal-status-badge">NEW</span>
+                        <span class="priority-badge" id="modal-priority-badge">NORMAL</span>
+                    </div>
+                    <p class="modal-time" id="modal-created-time">Reported: —</p>
+                </div>
+                <button class="btn-close-modal" id="btn-close-detail-modal">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Dual Image Comparison -->
+                <div class="modal-images-grid">
+                    <div class="modal-img-box">
+                        <div class="modal-img-lbl">ORIGINAL ROAD IMAGE</div>
+                        <div class="img-frame">
+                            <img id="modal-original-img" alt="Original Road Photo">
+                        </div>
+                    </div>
+
+                    <div class="modal-img-box highlight">
+                        <div class="modal-img-lbl">AI ANALYSIS (BOUNDING BOXES & CONFIDENCE)</div>
+                        <div class="img-frame">
+                            <img id="modal-annotated-img" alt="AI Annotated Road Photo">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Breakdown & RHS -->
+                <div class="modal-details-grid">
+                    <div class="detail-box">
+                        <h4>ROAD HEALTH SCORE (RHS)</h4>
+                        <div class="modal-phs-display">
+                            <span class="score" id="modal-phs-score">--</span>
+                            <span class="score-denom">/ 100</span>
+                            <span class="condition-badge" id="modal-condition-badge">GOOD</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-box">
+                        <h4>DETECTED DEFECTS BREAKDOWN</h4>
+                        <div class="defect-counts-inline">
+                            <span>Potholes: <strong id="modal-potholes-count">0</strong></span>
+                            <span>Cracks: <strong id="modal-cracks-count">0</strong></span>
+                            <span>Total: <strong id="modal-total-count">0</strong></span>
+                        </div>
+                        <div class="modal-detections-list" id="modal-detections-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location & Interactive Map -->
+                <div class="detail-box">
+                    <div class="loc-title-row">
+                        <h4>LOCATION & GIS</h4>
+                        <a id="modal-gmaps-link" target="_blank" rel="noopener noreferrer" class="btn-link-map">Open in Google Maps ↗</a>
+                    </div>
+                    <p class="text-sm" id="modal-loc-text">Lat: —, Lon: —, Accuracy: ±—m</p>
+                    <div id="modal-leaflet-map" class="modal-map-view"></div>
+                </div>
+
+                <!-- Citizen Description & Phone (if provided) -->
+                <div class="detail-box" id="modal-citizen-info-box">
+                    <h4>CITIZEN REMARKS</h4>
+                    <p id="modal-citizen-desc">No additional remarks provided.</p>
+                    <p class="text-sm" id="modal-citizen-phone">Contact: —</p>
+                </div>
+
+                <!-- Timeline History -->
+                <div class="detail-box">
+                    <h4>COMPLAINT AUDIT TIMELINE</h4>
+                    <div class="timeline-stepper" id="modal-timeline-container">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Officer Action Controls (Only visible to Officer) -->
+                <div class="detail-box officer-actions-box" id="modal-officer-controls">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h4 style="margin:0;">OFFICER ACTIONS & STATUS UPDATE</h4>
+                        <button type="button" class="btn btn-status-delete" id="btn-delete-complaint" title="Permanently delete this complaint">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle; margin-right:4px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Delete Complaint
+                        </button>
+                    </div>
+                    <div class="status-buttons-row">
+                        <button class="btn btn-status btn-status-review" data-status="UNDER REVIEW">Mark Under Review</button>
+                        <button class="btn btn-status btn-status-verify" data-status="VERIFIED">Verify Complaint</button>
+                        <button class="btn btn-status btn-status-progress" data-status="IN PROGRESS">Mark In Progress</button>
+                        <button class="btn btn-status btn-status-resolve" data-status="RESOLVED">Mark Resolved</button>
+                        <button class="btn btn-status btn-status-reject" data-status="REJECTED">Reject</button>
+                    </div>
+
+                    <div class="officer-notes-wrap">
+                        <label for="modal-officer-notes">Add Officer Notes / Work Order Instructions</label>
+                        <textarea id="modal-officer-notes" rows="2" class="form-input" placeholder="e.g. Assigned to Road Maintenance Team Alpha. Bitumen patch scheduled."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- Application Script -->
+    <script src="script.js"></script>
+</body>
+</html>

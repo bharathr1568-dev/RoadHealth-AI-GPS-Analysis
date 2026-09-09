@@ -1,0 +1,63 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "title": "RoadHealth AI Reference Road — Tamil Nadu 1 km Benchmark",
+    "description": "Real-world ~1 km road segment in Tamil Nadu, India extracted from OpenStreetMap for Route-Aware Pavement Intelligence benchmark.",
+    "state": "Tamil Nadu",
+    "country": "India",
+    "crs": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "roadId": "TN-NH32-GST-01",
+        "roadName": "Grand Southern Trunk Road (GST Road / NH 32)",
+        "tamilName": "மாபெரும் தெற்கு வழித்தடம்",
+        "highwayType": "trunk",
+        "surface": "asphalt",
+        "lanes": "2",
+        "location": "Pallavaram - Chromepet Corridor, Chennai Metropolitan Region",
+        "district": "Chengalpattu",
+        "state": "Tamil Nadu",
+        "country": "India",
+        "osmSource": "OpenStreetMap (Way ID: 95641232)",
+        "osmWayId": 95641232,
+        "approximateLengthMeters": 1008.95,
+        "approximateLengthKm": 1.009,
+        "nodeCount": 16,
+        "startPoint": {
+          "latitude": 12.9563171,
+          "longitude": 80.1431335,
+          "description": "GST Road South Terminal (Pallavaram Flyover approach, Tamil Nadu)"
+        },
+        "endPoint": {
+          "latitude": 12.964329,
+          "longitude": 80.147496,
+          "description": "GST Road North Terminal (Chromepet Junction sector, Tamil Nadu)"
+        }
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [80.1431335, 12.9563171],
+          [80.143176, 12.956421],
+          [80.143557, 12.957118],
+          [80.143821, 12.957625],
+          [80.144056, 12.958029],
+          [80.144209, 12.958324],
+          [80.144251, 12.958416],
+          [80.145728, 12.961236],
+          [80.1459, 12.961532],
+          [80.146515, 12.962591],
+          [80.147021, 12.963546],
+          [80.147049, 12.963587],
+          [80.147078, 12.963642],
+          [80.14715, 12.963776],
+          [80.147319, 12.964046],
+          [80.147496, 12.964329]
+        ]
+      }
+    }
+  ]
+}
