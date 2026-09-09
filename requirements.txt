@@ -1,5 +1,5 @@
 # ── Core AI ────────────────────────────────────────────────────
-ltralytics>=8.0.0
+ultralytics>=8.0.0
 torch==2.7.1
 torchvision==0.22.1
 opencv-python-headless>=4.8.0
