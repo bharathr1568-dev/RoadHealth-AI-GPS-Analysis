@@ -60,7 +60,7 @@ else:
     DB_TYPE = "SQLite"
 
 # Storage Configuration
-STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "auto")  # "auto", "local", "cloudinary"
+STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "local")  # "local", "cloudinary", "auto"
 
 # ── Frontend path ─────────────────────────────────────────────
 FRONTEND_DIR = PROJECT_ROOT / "frontend"

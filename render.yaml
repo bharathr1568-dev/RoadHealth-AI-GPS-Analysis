@@ -23,10 +23,5 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-
-databases:
-  - name: roadhealth-db
-    region: oregon
-    plan: free
-    databaseName: roadhealth
-    user: roadadmin
+      - key: CLOUDINARY_URL
+        sync: false

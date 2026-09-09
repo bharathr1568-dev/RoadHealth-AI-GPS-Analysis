@@ -62,12 +62,8 @@ class LocalStorageProvider(StorageProvider):
 
 
 def is_production_env() -> bool:
-    """Check if running in production on Render."""
-    return bool(
-        os.environ.get("RENDER", "").lower() in ("true", "1") or
-        os.environ.get("ENVIRONMENT", "").lower() == "production" or
-        os.environ.get("STORAGE_BACKEND", "").lower() == "cloudinary"
-    )
+    """Check if running with explicit Cloudinary production backend."""
+    return os.environ.get("STORAGE_BACKEND", "").lower() == "cloudinary"
 
 
 class CloudinaryStorageProvider(StorageProvider):
@@ -111,12 +107,12 @@ class CloudinaryStorageProvider(StorageProvider):
             return secure_url
         except Exception as e:
             if is_production_env():
-                logger.error(f"Cloudinary upload failed in production: {e}")
+                logger.error(f"Cloudinary upload failed: {e}")
                 raise RuntimeError(
                     f"Cloudinary image upload failed: {e}. "
-                    "Image submission halted to prevent data loss on ephemeral disk."
+                    "Image submission halted to prevent data loss."
                 )
-            logger.error(f"Cloudinary upload failed: {e}. Falling back to local storage in local dev.")
+            logger.error(f"Cloudinary upload failed: {e}. Falling back to local storage.")
             return LocalStorageProvider().save_bytes(image_bytes, filename, folder)
 
     def save_cv2_image(self, image_bgr: np.ndarray, filename: str, folder: str = "results", quality: int = 92) -> str:
@@ -127,12 +123,12 @@ class CloudinaryStorageProvider(StorageProvider):
             return self.save_bytes(buffer.tobytes(), filename, folder)
         except Exception as e:
             if is_production_env():
-                logger.error(f"Cloudinary cv2 upload failed in production: {e}")
+                logger.error(f"Cloudinary cv2 upload failed: {e}")
                 raise RuntimeError(
                     f"Cloudinary annotated image upload failed: {e}. "
-                    "Image submission halted to prevent data loss on ephemeral disk."
+                    "Image submission halted to prevent data loss."
                 )
-            logger.error(f"Cloudinary cv2 upload failed: {e}. Falling back to local storage in local dev.")
+            logger.error(f"Cloudinary cv2 upload failed: {e}. Falling back to local storage.")
             return LocalStorageProvider().save_cv2_image(image_bgr, filename, folder, quality)
 
 
@@ -144,49 +140,53 @@ _storage_provider: Optional[StorageProvider] = None
 def get_storage_provider() -> StorageProvider:
     """
     Returns the configured StorageProvider.
-    In production (Render), strictly requires Cloudinary to prevent permanent image loss on ephemeral disks.
-    In local development, uses LocalStorageProvider for zero-setup SQLite + local files workflow.
+    - If STORAGE_BACKEND=local: uses LocalStorageProvider (Render Phase 1 ephemeral local disk or local dev).
+    - If STORAGE_BACKEND=cloudinary: uses CloudinaryStorageProvider (requires CLOUDINARY_URL).
+    - If STORAGE_BACKEND=auto (or unset): uses Cloudinary if credentials exist, else LocalStorageProvider.
     """
     global _storage_provider
     if _storage_provider is not None:
         return _storage_provider
 
-    backend = os.environ.get("STORAGE_BACKEND", "auto").lower()
+    backend = os.environ.get("STORAGE_BACKEND", "local").lower().strip()
     has_cloudinary_creds = bool(
         os.environ.get("CLOUDINARY_URL") or
         (os.environ.get("CLOUDINARY_CLOUD_NAME") and os.environ.get("CLOUDINARY_API_KEY"))
     )
 
-    # 1. Production Mode Check (Render / production flag)
-    if is_production_env():
+    # 1. Explicit Local Storage (Phase 1 Render deployment or local development)
+    if backend == "local":
+        _storage_provider = LocalStorageProvider()
+        logger.info("Active Storage: LOCAL FILESYSTEM (Local / Ephemeral Storage)")
+        return _storage_provider
+
+    # 2. Explicit Cloudinary Storage requested
+    if backend == "cloudinary":
         if not has_cloudinary_creds:
             error_msg = (
-                "CRITICAL CONFIGURATION ERROR: Production deployment on Render requires "
-                "Cloudinary for persistent road damage photo storage, but CLOUDINARY_URL is missing. "
-                "Render ephemeral disk cannot be used for citizen defect photos. "
-                "Please configure the 'CLOUDINARY_URL' environment variable in your Render dashboard."
+                "STORAGE_BACKEND is set to 'cloudinary', but CLOUDINARY_URL is missing. "
+                "Please configure the 'CLOUDINARY_URL' environment variable or set STORAGE_BACKEND=local."
             )
             logger.error(error_msg)
             raise RuntimeError(error_msg)
 
         try:
             _storage_provider = CloudinaryStorageProvider()
-            logger.info("Active Storage: CLOUDINARY (Production Cloud Storage)")
-            return _storage_provider
-        except Exception as e:
-            logger.error(f"Failed to initialize Cloudinary in production: {e}")
-            raise RuntimeError(f"Cloudinary initialization failed: {e}")
-
-    # 2. Explicit Cloudinary in local dev
-    if backend == "cloudinary" or (backend == "auto" and has_cloudinary_creds):
-        try:
-            _storage_provider = CloudinaryStorageProvider()
             logger.info("Active Storage: CLOUDINARY (Cloud Storage)")
             return _storage_provider
         except Exception as e:
-            logger.warning(f"Failed to initialize Cloudinary storage ({e}). Using LocalStorageProvider.")
+            logger.error(f"Failed to initialize Cloudinary storage: {e}")
+            raise RuntimeError(f"Cloudinary initialization failed: {e}")
 
-    # 3. Default Local Development
+    # 3. Auto Mode: use Cloudinary if credentials are provided, otherwise local filesystem
+    if has_cloudinary_creds:
+        try:
+            _storage_provider = CloudinaryStorageProvider()
+            logger.info("Active Storage: CLOUDINARY (Auto-detected Cloud Storage)")
+            return _storage_provider
+        except Exception as e:
+            logger.warning(f"Failed to initialize Cloudinary storage ({e}). Falling back to LocalStorageProvider.")
+
     _storage_provider = LocalStorageProvider()
-    logger.info("Active Storage: LOCAL FILESYSTEM (Local Development)")
+    logger.info("Active Storage: LOCAL FILESYSTEM")
     return _storage_provider
