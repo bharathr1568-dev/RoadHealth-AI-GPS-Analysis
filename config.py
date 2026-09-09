@@ -97,3 +97,36 @@ if _env_file.exists():
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
+
+def get_rss_mb() -> float:
+    """Return current process RSS memory in MB."""
+    try:
+        import psutil
+        return round(psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024), 2)
+    except Exception:
+        try:
+            import resource
+            return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024, 2)
+        except Exception:
+            return 0.0
+
+
+def trim_memory() -> bool:
+    """
+    Safely return unused heap memory back to the OS.
+    Uses glibc's malloc_trim(0) on Linux (e.g. Render environment).
+    Returns True if malloc_trim was successfully called, False otherwise.
+    """
+    try:
+        import sys
+        if sys.platform.startswith("linux"):
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            if hasattr(libc, "malloc_trim"):
+                res = libc.malloc_trim(0)
+                return bool(res)
+    except Exception:
+        pass
+    return False
+
+

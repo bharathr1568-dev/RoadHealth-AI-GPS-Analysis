@@ -8,12 +8,19 @@ import time
 import traceback
 from pathlib import Path
 
+import gc
 import cv2
 import numpy as np
+import torch
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 
-from backend.config import MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, MODEL_INFO, get_rss_mb
-from backend.services.inference import run_full_pipeline, get_class_names, load_model
+from backend.config import MAX_FILE_SIZE_MB, ALLOWED_EXTENSIONS, MODEL_INFO, get_rss_mb, trim_memory
+from backend.services.inference import (
+    run_full_pipeline,
+    get_class_names,
+    load_model,
+    cleanup_inference_memory,
+)
 from backend.services.phs import format_phs_response
 from backend.services.location import (
     validate_coordinates,
@@ -152,6 +159,13 @@ async def analyze_road(
         pipeline_result = run_full_pipeline(image_bgr)
     except Exception as e:
         logger.error(f"Inference pipeline error: {traceback.format_exc()}")
+        try:
+            del file_bytes
+            del np_arr
+            del image_bgr
+        except Exception:
+            pass
+        cleanup_inference_memory()
         raise HTTPException(
             status_code=500,
             detail=f"AI analysis failed: {str(e)}"
@@ -189,9 +203,28 @@ async def analyze_road(
         },
     }
 
+    # ── 6. Request-local memory cleanup ──────────────────────────
+    logger.info(f"[MEM G] Before cleanup | RSS: {get_rss_mb():.1f} MB")
+
+    # Release large request-local variables
+    del file_bytes
+    del np_arr
+    del image_bgr
+    del pipeline_result
+    del phs_data
+    del location_data
+
+    # Cleanup inference internals & garbage collection
+    cleanup_inference_memory()
+    logger.info(f"[MEM H] After del + gc.collect() | RSS: {get_rss_mb():.1f} MB")
+
+    # Return unmapped heap pages to OS via glibc malloc_trim on Linux
+    trimmed = trim_memory()
+    logger.info(f"[MEM I] After malloc_trim() (supported={trimmed}) | RSS: {get_rss_mb():.1f} MB")
+
     logger.info(
-        f"[DIAG 10/10] Analysis complete: {phs_data['total_defects']} defects, "
-        f"PHS={phs_data['phs']}, {t_elapsed:.2f}s | [MEM] Before API response: {get_rss_mb():.1f} MB. Returning API response..."
+        f"[DIAG 10/10] Analysis complete: {response['summary']['total_defects']} defects, "
+        f"PHS={response['summary']['phs']}, {t_elapsed:.2f}s | [MEM J] Before returning API response | RSS: {get_rss_mb():.1f} MB. Returning API response..."
     )
 
     return response

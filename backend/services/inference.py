@@ -48,7 +48,7 @@ if _project_root not in sys.path:
 from ultralytics import YOLO
 import ultralytics.nn.tasks as tasks
 
-from backend.config import BASELINE_MODEL_PATH, CBAM_MODEL_PATH, RESULTS_DIR, UPLOADS_DIR, get_rss_mb
+from backend.config import BASELINE_MODEL_PATH, CBAM_MODEL_PATH, RESULTS_DIR, UPLOADS_DIR, get_rss_mb, trim_memory
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -366,13 +366,12 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         model = load_model()
 
         # 1. Multi-pass inference (full + tiled) on verified road image
-        logger.info(f"[MEM] Before YOLO inference | RSS: {get_rss_mb():.1f} MB")
+        logger.info(f"[MEM A] Before YOLO inference | RSS: {get_rss_mb():.1f} MB")
         logger.info("Running YOLO11m-P2P3-CBAM inference pipeline...")
         try:
             with torch.inference_mode():
                 all_raw, nms_detections = run_inference(model, image_bgr)
             logger.info(f"Raw detections: {len(all_raw)}, after NMS: {len(nms_detections)}")
-            logger.info(f"[MEM] After YOLO inference | RSS: {get_rss_mb():.1f} MB")
         except Exception as e:
             logger.error(f"[DIAG ERROR] run_inference pipeline failed: {e}\n{traceback.format_exc()}")
             raise
@@ -382,7 +381,7 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         try:
             final_detections = process_detections(nms_detections, image_bgr)
             logger.info(f"[DIAG 5/10] Detection processing completed: {len(final_detections)} final detections.")
-            logger.info(f"[MEM] After result processing | RSS: {get_rss_mb():.1f} MB")
+            logger.info(f"[MEM D] After detection processing | RSS: {get_rss_mb():.1f} MB")
         except Exception as e:
             logger.error(f"[DIAG ERROR] process_detections failed: {e}\n{traceback.format_exc()}")
             raise
@@ -407,7 +406,7 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
     try:
         annotated = draw_detections(image_bgr, features)
         logger.info(f"[DIAG 7/10] Annotated image generated successfully (shape={annotated.shape}).")
-        logger.info(f"[MEM] After annotation | RSS: {get_rss_mb():.1f} MB")
+        logger.info(f"[MEM E] After annotation | RSS: {get_rss_mb():.1f} MB")
     except Exception as e:
         logger.error(f"[DIAG ERROR] draw_detections failed: {e}\n{traceback.format_exc()}")
         raise
@@ -425,6 +424,8 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         original_url = storage.save_cv2_image(image_bgr, original_filename, folder="uploads", quality=95)
         annotated_url = storage.save_cv2_image(annotated, result_filename, folder="results", quality=92)
         logger.info(f"[DIAG 9/10] Files saved successfully: original={original_url}, annotated={annotated_url}")
+        logger.info(f"[MEM F] After saving files | RSS: {get_rss_mb():.1f} MB")
+        del annotated
     except Exception as e:
         logger.error(f"[DIAG ERROR] Storage save_cv2_image failed: {e}\n{traceback.format_exc()}")
         raise
@@ -441,6 +442,18 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
             "merged_count": int(d.get("merged_count", 1)),
         })
 
+    raw_count = int(len(all_raw))
+    nms_count = int(len(nms_detections))
+    final_count = int(len(final_detections))
+    img_w = int(W)
+    img_h = int(H)
+
+    # Release intermediate lists
+    del all_raw
+    del nms_detections
+    del final_detections
+    del features
+
     return {
         "detections": detection_list,
         "summary": health_summary,
@@ -448,10 +461,40 @@ def run_full_pipeline(image_bgr: np.ndarray) -> dict:
         "result_image_filename": result_filename,
         "original_image_url": original_url,
         "result_image_url": annotated_url,
-        "raw_count": int(len(all_raw)),
-        "nms_count": int(len(nms_detections)),
-        "final_count": int(len(final_detections)),
-        "image_width": int(W),
-        "image_height": int(H),
+        "raw_count": raw_count,
+        "nms_count": nms_count,
+        "final_count": final_count,
+        "image_width": img_w,
+        "image_height": img_h,
     }
+
+
+def cleanup_inference_memory() -> bool:
+    """
+    Release temporary inference memory after an analysis request completes:
+    - Clears YOLO model.predictor and cached batches/results.
+    - Explicitly triggers Python garbage collection (gc.collect).
+    - Clears CUDA cache if CUDA is active.
+    - Trims glibc malloc heap via malloc_trim(0) on Linux.
+    """
+    global _model
+    if _model is not None:
+        if hasattr(_model, "predictor") and _model.predictor is not None:
+            try:
+                _model.predictor.results = None
+                _model.predictor.batch = None
+                _model.predictor.dataset = None
+            except Exception:
+                pass
+            _model.predictor = None
+
+    gc.collect()
+
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+    return trim_memory()
 

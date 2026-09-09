@@ -32,6 +32,7 @@ from config import (
     CONF_POTHOLE, CONF_CRACK,
     CONF_TILE_POTHOLE, CONF_TILE_CRACK,
     USE_CLAHE_AUX, IOU_MERGE_THRESHOLD,
+    get_rss_mb,
 )
 from utils import normalize_class_name, box_iou
 
@@ -171,6 +172,7 @@ def _run_pass(model, img_bgr, source_name, x_offset=0, y_offset=0,
         logger.info(f"[DIAG 2/10] YOLO model.predict completed successfully on '{source_name}'.")
         box_counts = [len(r.boxes) if (hasattr(r, 'boxes') and r.boxes is not None) else 0 for r in results]
         logger.info(f"[DIAG 3/10] Results returned from '{source_name}': count={len(results)}, type={type(results).__name__}, boxes={box_counts}")
+        logger.info(f"[MEM B] Immediately after YOLO inference | RSS: {get_rss_mb():.1f} MB")
     except Exception as e:
         logger.error(f"[DIAG ERROR] YOLO model.predict failed on '{source_name}': {e}\n{traceback.format_exc()}")
         raise
@@ -222,9 +224,18 @@ def _run_pass(model, img_bgr, source_name, x_offset=0, y_offset=0,
                 "source": source_name,
             })
 
-    # Release raw PyTorch results object and collect garbage
+    # Release raw PyTorch results object and detach cached predictor internals
     del results
+    if hasattr(model, "predictor") and model.predictor is not None:
+        try:
+            model.predictor.results = None
+            model.predictor.batch = None
+            model.predictor.dataset = None
+        except Exception:
+            pass
+        model.predictor = None
     gc.collect()
+    logger.info(f"[MEM C] After result extraction | RSS: {get_rss_mb():.1f} MB")
 
     return detections
 
